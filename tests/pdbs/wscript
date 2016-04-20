@@ -2,33 +2,24 @@
 # generate a link warning that the PDB file is not found with the
 # object.
 #
-# Increase the number of jobs and tests to see the warning. Increase
-# the sleep to see it go away.
+# Increase the number of jobs and tests to see the warning. Uncomment the taskgen
+# method or provide unique pdbs to make it go away.
 #
-#    waf -j16 --n 20 --sleep 0
+#    waf -j16 --n 20
 
-from waflib import Task
+from waflib import Logs, Task, TaskGen
+from waflib.Logs import info
 
 def options(opt):
-	opt.add_option('--sleep',
-		action = 'store',
-		type = 'float',
-		default = 0.0,
-		dest = 'sleep',
-		help = 'Set the sleep time before each link task.')
-	opt.add_option('--n',
-		action = 'store',
-		type = 'int',
-		default = 10,
-		dest = 'n_tests',
-		help = 'Set the number of programs to build.')
+	opt.add_option('--n', action = 'store', type = 'int', default = 10,
+		dest = 'n_tests', help = 'Set the number of programs to build.')
 
 	opt.load('compiler_c')
 
 def configure(conf):
 	conf.load('compiler_c')
 	conf.env.append_value('CFLAGS', ['/Zi', '/FS', '/MDd'])
-	conf.env.append_value('LINKFLAGS', ['/DEBUG', '/MANIFEST', '/INCREMENTAL:NO'])
+	conf.env.append_value('LINKFLAGS', ['/DEBUG'])
 
 def build(bld):
 	Task.classes['link'].ext_in.append('.o')
@@ -40,34 +31,10 @@ def build(bld):
 
 		    # setting a unique PDB file solves the problem
 		    #cflags = bld.env.CFLAGS + ['/FdvcTest%s' % t],
-
-		    # setting a sleep somewhere in the build order can solve
-		    # the problem, if forced before any link starts (see
-		    # sleep_task below)
-		    sleep = bld.options.sleep)
-
-from waflib import TaskGen
-@TaskGen.feature('c')
-def sleep_if_set(self):
-	t = getattr(self, 'sleep', 0.0)
-	if t > 0:
-		self.create_task('sleep')
-
-class sleep_task(Task.Task):
-	# with no extension constraints, sleeps and links are interleaved
-	# and the warning can occur
-
-	#ext_in = '.bin'	   # force sleeps after all links complete
-	ext_out = '.o'	   # force all sleeps before any link starts
-
-	def run(self):
-		import time
-		time.sleep(self.generator.sleep)
-		return 0
-
+		    )
 
 @TaskGen.feature('c', 'cxx')
-@TaskGen.after_method('apply_link')
+@TaskGen.after_method('apply_link', 'process_source')
 def propagate_compiler_debug_symbols(self):
 	"""For msvc, determine the implicit or explicit PDB for each source
 	file configured to generate debug info. These files become
@@ -102,7 +69,7 @@ def propagate_compiler_debug_symbols(self):
 				pdb = f[3:]
 
 		if pdb:
-			print 'taskgen', self.target, ' depends on task ', t, ' pdb=', pdb
+			info("taskgen %s depends on task %s, pdb=%s" % (self.target, t, pdb))
 
 			node = self.path.find_or_declare(pdb + '.pdb')
 			t.outputs.append(node)
