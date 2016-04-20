@@ -45,13 +45,15 @@ def propagate_compiler_debug_symbols(self):
 	unrelated compiler instances are still writing debug info to the
 	same file.
 	"""
-	if self.env.CC_NAME != 'msvc' or not getattr(self, 'link_task', None):
+	if self.env.CC_NAME != 'msvc':
 		return
 
-	try:
-		pdbs = getattr(self.link_task, 'pdbs', [])
-	except AttributeError:
-		pdbs = self.link_task.pdbs = []
+	link_task = getattr(self, 'link_task', None)
+	if link_task:
+		try:
+			pdbs = getattr(self.link_task, 'pdbs', [])
+		except AttributeError:
+			pdbs = self.link_task.pdbs = []
 
 	for t in getattr(self, 'compiled_tasks', []):
 		pdb = None
@@ -73,5 +75,6 @@ def propagate_compiler_debug_symbols(self):
 
 			node = self.path.find_or_declare(pdb + '.pdb')
 			t.outputs.append(node)
-			if not node in self.link_task.dep_nodes:
-				self.link_task.dep_nodes.append(node)
+
+			if link_task and not node in link_task.dep_nodes:
+				link_task.dep_nodes.append(node)
