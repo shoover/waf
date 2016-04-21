@@ -181,5 +181,8 @@ def apply_unique_pdb_per_target(self):
 			fd = True
 
 	if debug and not fd:
+		# The .vc.pdb extension makes the file different than the default link
+		# pdb. It actually seems to work if you let them conflict, but who knows
+		# if that's a good idea.
 		pdb = "%s.vc.pdb" % self.get_name()
 		self.env.append_value('CFLAGS', '/Fd%s' % pdb)
